@@ -115,27 +115,27 @@ function Homepage() {
 
   const urlOptions = [
     [
-      { name: "Alex Poem - Dynamic", url: "/data/alex_poem_dynamic.csv" },
-      { name: "Alex Poem - Monotone", url: "/data/alex_poem_monotone.csv" },
-      { name: "Ivy Poem - Dynamic", url: "/data/ivy_poem_dynamic.csv" },
-      { name: "Ivy Poem - Monotone", url: "/data/ivy_poem_monotone.csv" },
-      { name: "Test 1", url: "/data/test1.csv" },
-      { name: "Test 2", url: "/data/test2.csv" },
+      { name: "Alex Poem - Dynamic", url: "data/alex_poem_dynamic.csv" },
+      { name: "Alex Poem - Monotone", url: "data/alex_poem_monotone.csv" },
+      { name: "Ivy Poem - Dynamic", url: "data/ivy_poem_dynamic.csv" },
+      { name: "Ivy Poem - Monotone", url: "data/ivy_poem_monotone.csv" },
+      { name: "Test 1", url: "data/test1.csv" },
+      { name: "Test 2", url: "data/test2.csv" },
     ],
     [
-      { name: "Martin HBS2", url: "/data/martin_hbs2.csv" },
-      { name: "Fernanda HBS2", url: "/data/fernanda_hbs2.csv" },
-      { name: "Finale", url: "/data/finale.csv" },
-      { name: "Obama Speech", url: "/data/obama_speech.csv" },
-      { name: "Obama Interview", url: "/data/obama_interview.csv" },
+      { name: "Martin HBS2", url: "data/martin_hbs2.csv" },
+      { name: "Fernanda HBS2", url: "data/fernanda_hbs2.csv" },
+      { name: "Finale", url: "data/finale.csv" },
+      { name: "Obama Speech", url: "data/obama_speech.csv" },
+      { name: "Obama Interview", url: "data/obama_interview.csv" },
     ],
     [
-      { name: "Alex Poem - Dynamic", url: "/data/alex_poem_dynamic.csv" },
-      { name: "Alex Poem - Monotone", url: "/data/alex_poem_monotone.csv" },
-      { name: "Ivy Poem - Dynamic", url: "/data/ivy_poem_dynamic.csv" },
-      { name: "Ivy Poem - Monotone", url: "/data/ivy_poem_monotone.csv" },
-      { name: "Test 1", url: "/data/test1.csv" },
-      { name: "Test 2", url: "/data/test2.csv" },
+      { name: "Alex Poem - Dynamic", url: "data/alex_poem_dynamic.csv" },
+      { name: "Alex Poem - Monotone", url: "data/alex_poem_monotone.csv" },
+      { name: "Ivy Poem - Dynamic", url: "data/ivy_poem_dynamic.csv" },
+      { name: "Ivy Poem - Monotone", url: "data/ivy_poem_monotone.csv" },
+      { name: "Test 1", url: "data/test1.csv" },
+      { name: "Test 2", url: "data/test2.csv" },
     ],
   ];
 
@@ -351,8 +351,8 @@ function Homepage() {
     // Load data using fetch instead of direct imports
     setLoading1(true);
     setLoading2(true);
-    grabData("/data/martin_hbs2.csv", setData, setLoading1);
-    grabData("/data/fernanda_hbs2.csv", setData2, setLoading2);
+    grabData("data/martin_hbs2.csv", setData, setLoading1);
+    grabData("data/fernanda_hbs2.csv", setData2, setLoading2);
   }, []);
 
   useEffect(() => {
