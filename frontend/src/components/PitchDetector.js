@@ -22,9 +22,9 @@ export const detectPitchAndVolumeFromAudio = async (
     console.log("Sample rate:", audioBuffer.sampleRate);
     console.log("Total samples:", audioData.length);
 
-    // Parameters for analysis - match backend settings
-    const frameSize = 512; // Match backend FRAME_SIZE
-    const hopSize = 512; // Match backend HOP_LENGTH
+    // Parameters for analysis
+    const frameSize = 2048; // Number of samples per analysis frame
+    const hopSize = 512; // Number of samples to advance between frames
     const pitchValues = [];
     const volumeValues = [];
     const timestamps = [];
@@ -43,18 +43,21 @@ export const detectPitchAndVolumeFromAudio = async (
         audioBuffer.sampleRate
       );
 
-      // Calculate amplitude using max amplitude (matching backend)
-      const maxAmplitude = Math.max(...frame.map(Math.abs));
-      volumeValues.push(maxAmplitude);
+      // Calculate volume (RMS - Root Mean Square) for this frame
+      const rms = Math.sqrt(
+        frame.reduce((sum, sample) => sum + sample * sample, 0) / frame.length
+      );
+      const volumeDb = 20 * Math.log10(Math.max(rms, 1e-10)); // Convert to dB
+      const volumeNormalized = Math.max(0, (volumeDb + 60) / 60); // Normalize to 0-1 range
 
       // Only include pitch values with good clarity and within human voice range
-      // Match backend pitch range: 50-350 Hz
-      if (clarity > 0.8 && pitch >= 50 && pitch <= 350) {
+      if (clarity > 0.6 && pitch >= 60 && pitch <= 350) {
         pitchValues.push(pitch);
       } else {
         pitchValues.push(null); // No pitch detected or outside range
       }
 
+      volumeValues.push(volumeNormalized);
       timestamps.push(timestamp);
     }
 
@@ -85,21 +88,21 @@ export const detectPitchAndVolumeFromAudio = async (
     const minPitch = validPitches.length > 0 ? Math.min(...validPitches) : 0;
     const maxPitch = validPitches.length > 0 ? Math.max(...validPitches) : 0;
 
-    // Calculate amplitude statistics
-    const avgAmplitude =
+    // Calculate volume statistics
+    const avgVolume =
       volumeValues.reduce((sum, vol) => sum + vol, 0) / volumeValues.length;
-    const minAmplitude = Math.min(...volumeValues);
-    const maxAmplitude = Math.max(...volumeValues);
+    const minVolume = Math.min(...volumeValues);
+    const maxVolume = Math.max(...volumeValues);
 
     console.log("Pitch statistics:");
     console.log("Average pitch:", avgPitch.toFixed(2), "Hz");
     console.log("Min pitch:", minPitch.toFixed(2), "Hz");
     console.log("Max pitch:", maxPitch.toFixed(2), "Hz");
 
-    console.log("Amplitude statistics:");
-    console.log("Average amplitude:", avgAmplitude.toFixed(4));
-    console.log("Min amplitude:", minAmplitude.toFixed(4));
-    console.log("Max amplitude:", maxAmplitude.toFixed(4));
+    console.log("Volume statistics:");
+    console.log("Average volume:", avgVolume.toFixed(4));
+    console.log("Min volume:", minVolume.toFixed(4));
+    console.log("Max volume:", maxVolume.toFixed(4));
 
     return {
       // Pitch data
@@ -114,13 +117,13 @@ export const detectPitchAndVolumeFromAudio = async (
         validMeasurements: validPitches.length,
       },
 
-      // Amplitude data (using max amplitude like backend)
+      // Volume data
       volumes: volumeValues,
       volumeTimestamps: timestamps,
       volumeStatistics: {
-        average: avgAmplitude,
-        min: minAmplitude,
-        max: maxAmplitude,
+        average: avgVolume,
+        min: minVolume,
+        max: maxVolume,
         totalMeasurements: volumeValues.length,
       },
 
@@ -134,10 +137,10 @@ export const detectPitchAndVolumeFromAudio = async (
           totalMeasurements: pitchValues.length,
           validMeasurements: validPitches.length,
         },
-        amplitude: {
-          average: avgAmplitude,
-          min: minAmplitude,
-          max: maxAmplitude,
+        volume: {
+          average: avgVolume,
+          min: minVolume,
+          max: maxVolume,
           totalMeasurements: volumeValues.length,
         },
       },
@@ -203,7 +206,7 @@ export const createPitchAnalyzer = (onPitchDetected) => {
       audioContext.sampleRate
     );
 
-    if (clarity > 0.8 && pitch >= 60 && pitch <= 400) {
+    if (clarity > 0.8 && pitch >= 60 && pitch <= 300) {
       onPitchDetected(pitch, clarity);
     }
 
@@ -242,46 +245,8 @@ export const createWordAnalysisArray = (transcription, audioData) => {
     const { volumes, volumeTimestamps, pitches, pitchTimestamps } = audioData;
 
     console.log("Processing", chunks.length, "word chunks");
-    console.log("Available amplitude measurements:", volumes.length);
+    console.log("Available volume measurements:", volumes.length);
     console.log("Available pitch measurements:", pitches.length);
-
-    // Calculate global averages for normalization (matching backend approach)
-    const avgAmplitude =
-      volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
-    const validPitches = pitches.filter((p) => p !== null && !isNaN(p));
-    const avgPitch =
-      validPitches.length > 0
-        ? validPitches.reduce((sum, p) => sum + p, 0) / validPitches.length
-        : 0;
-
-    console.log(
-      "Global averages - Amplitude:",
-      avgAmplitude.toFixed(4),
-      "Pitch:",
-      avgPitch.toFixed(2)
-    );
-
-    // Create resampled timestamps (matching backend: 100 points per second)
-    const maxTime = Math.max(...chunks.map((chunk) => chunk.timestamp[1]));
-    const stepNum = Math.floor(maxTime * 100); // 100 points per second like backend
-    const resampledTimestamps = Array.from(
-      { length: stepNum },
-      (_, i) => i / 100
-    );
-
-    // Resample amplitude and pitch data using spline interpolation
-    const resampledAmplitudes = resampleWithSpline(
-      volumeTimestamps,
-      volumes,
-      resampledTimestamps
-    );
-    const resampledPitches = resampleWithSpline(
-      pitchTimestamps,
-      pitches,
-      resampledTimestamps
-    );
-
-    console.log("Resampled data points:", resampledTimestamps.length);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -302,38 +267,51 @@ export const createWordAnalysisArray = (transcription, audioData) => {
         postSpace = nextChunk.timestamp[0] - endTime;
       }
 
-      // Find indices for this word's time period in resampled data
-      const startIdx = Math.floor(startTime * 100);
-      const endIdx = Math.floor(endTime * 100);
-
-      // Extract amplitude data for this word (matching backend approach)
-      const wordAmplitudes = resampledAmplitudes.slice(startIdx, endIdx + 1);
-      const wordPitches = resampledPitches.slice(startIdx, endIdx + 1);
-
-      // Calculate average amplitude for this word (matching backend)
+      // Calculate average amplitude for this word's time period
+      let wordAmplitudes = [];
+      for (let j = 0; j < volumeTimestamps.length; j++) {
+        const timestamp = volumeTimestamps[j];
+        if (timestamp >= startTime && timestamp <= endTime) {
+          wordAmplitudes.push(volumes[j]);
+        }
+      }
       const amplitude =
         wordAmplitudes.length > 0
           ? wordAmplitudes.reduce((sum, amp) => sum + amp, 0) /
             wordAmplitudes.length
           : 0;
 
-      // Normalize amplitude by global average (matching backend)
-      const normAmplitude = avgAmplitude > 0 ? amplitude / avgAmplitude : 0;
-
-      // Calculate average pitch for this word (matching backend)
-      const validWordPitches = wordPitches.filter(
-        (p) => p !== null && !isNaN(p) && p > 0
-      );
-      const pitch =
-        validWordPitches.length > 0
-          ? validWordPitches.reduce((sum, p) => sum + p, 0) /
-            validWordPitches.length
+      // Calculate variance of amplitude
+      const varAmplitude =
+        wordAmplitudes.length > 1
+          ? wordAmplitudes.reduce(
+              (sum, amp) => sum + Math.pow(amp - amplitude, 2),
+              0
+            ) /
+            (wordAmplitudes.length - 1)
           : 0;
 
-      // Normalize pitch by global average (matching backend)
-      const normPitch = avgPitch > 0 ? pitch / avgPitch : 0;
+      // Calculate average pitch for this word's time period
+      let wordPitches = [];
+      for (let j = 0; j < pitchTimestamps.length; j++) {
+        const timestamp = pitchTimestamps[j];
+        if (timestamp >= startTime && timestamp <= endTime) {
+          wordPitches.push(pitches[j]);
+        }
+      }
+      const pitch =
+        wordPitches.length > 0
+          ? wordPitches.reduce((sum, p) => sum + p, 0) / wordPitches.length
+          : 0;
 
-      // Create word analysis object (matching backend structure)
+      // Calculate variance of pitch
+      const varPitch =
+        wordPitches.length > 1
+          ? wordPitches.reduce((sum, p) => sum + Math.pow(p - pitch, 2), 0) /
+            (wordPitches.length - 1)
+          : 0;
+
+      // Create word analysis object
       const wordAnalysis = {
         Word: word,
         Start: startTime,
@@ -343,11 +321,11 @@ export const createWordAnalysisArray = (transcription, audioData) => {
         std_time_spent: stdTimeSpent,
         speed: speed,
         post_space: postSpace,
-        amplitude: normAmplitude, // Normalized amplitude
-        pitch: normPitch, // Normalized pitch
-        time: startTime + (endTime - startTime) / 2, // Center time like backend
-        raw_amplitude: amplitude, // Raw amplitude for reference
-        raw_pitch: pitch, // Raw pitch for reference
+        amplitude: amplitude,
+        pitch: pitch,
+        time: startTime, // Using start time as reference
+        var_amplitude: varAmplitude,
+        var_pitch: varPitch,
       };
 
       wordAnalysisArray.push(wordAnalysis);
@@ -358,12 +336,10 @@ export const createWordAnalysisArray = (transcription, audioData) => {
         end: endTime.toFixed(3),
         length,
         timeSpent: timeSpent.toFixed(3),
-        rawAmplitude: amplitude.toFixed(4),
-        normAmplitude: normAmplitude.toFixed(4),
-        rawPitch: pitch.toFixed(2),
-        normPitch: normPitch.toFixed(4),
+        amplitude: amplitude.toFixed(4),
+        pitch: pitch.toFixed(2),
         amplitudeSamples: wordAmplitudes.length,
-        pitchSamples: validWordPitches.length,
+        pitchSamples: wordPitches.length,
       });
     }
 
@@ -372,6 +348,7 @@ export const createWordAnalysisArray = (transcription, audioData) => {
       wordAnalysisArray.length,
       "entries"
     );
+    console.log("Sample entry:", wordAnalysisArray[0]);
 
     return wordAnalysisArray;
   } catch (error) {
@@ -383,39 +360,48 @@ export const createWordAnalysisArray = (transcription, audioData) => {
 // Function to convert word analysis array to audio format for visualization
 export const convertToAudioFormat = (wordAnalysisArray) => {
   try {
-    console.log("Converting word analysis to audio format...");
+    console.log(
+      "Converting word analysis to audio format for visualization..."
+    );
 
     if (!wordAnalysisArray || wordAnalysisArray.length === 0) {
       console.error("No word analysis data to convert");
-      return [];
+      return null;
     }
 
-    const audioFormat = [];
+    const audio = {
+      word: [],
+      start: [],
+      end: [],
+      amp: [],
+      pitch: [],
+      time: [],
+    };
 
-    for (const wordAnalysis of wordAnalysisArray) {
-      // Create audio format entry matching backend structure
-      const audioEntry = {
-        Word: wordAnalysis.Word,
-        Start: wordAnalysis.Start,
-        End: wordAnalysis.End,
-        length: wordAnalysis.length,
-        time_spent: wordAnalysis.time_spent,
-        std_time_spent: wordAnalysis.std_time_spent,
-        speed: wordAnalysis.speed,
-        post_space: wordAnalysis.post_space,
-        amplitude: wordAnalysis.amplitude, // Already normalized
-        pitch: wordAnalysis.pitch, // Already normalized
-        time: wordAnalysis.time,
-      };
+    // Convert each word analysis entry to the expected format
+    wordAnalysisArray.forEach((wordData) => {
+      audio.word.push(wordData.Word);
+      audio.start.push(wordData.Start);
+      audio.end.push(wordData.End);
+      audio.amp.push(wordData.amplitude);
+      audio.pitch.push(wordData.pitch);
+      audio.time.push(wordData.time);
+    });
 
-      audioFormat.push(audioEntry);
-    }
+    console.log("Audio format conversion completed");
+    console.log("Total words:", audio.word.length);
+    console.log("Sample audio data:", {
+      word: audio.word.slice(0, 3),
+      start: audio.start.slice(0, 3),
+      end: audio.end.slice(0, 3),
+      amp: audio.amp.slice(0, 3),
+      pitch: audio.pitch.slice(0, 3),
+    });
 
-    console.log("Converted", audioFormat.length, "entries to audio format");
-    return audioFormat;
+    return audio;
   } catch (error) {
     console.error("Error converting to audio format:", error);
-    return [];
+    return null;
   }
 };
 
@@ -493,82 +479,3 @@ export const exportToCSV = (
     console.error("Error exporting to CSV:", error);
   }
 };
-
-// Spline interpolation functions to match backend implementation
-function splineInterpolation(x, y, xNew) {
-  // Simple cubic spline interpolation
-  const n = x.length;
-  if (n < 2) return xNew.map(() => y[0] || 0);
-
-  // Calculate second derivatives for cubic spline
-  const h = [];
-  const b = [];
-  const u = [];
-  const v = [];
-
-  for (let i = 0; i < n - 1; i++) {
-    h[i] = x[i + 1] - x[i];
-    b[i] = 6 * ((y[i + 1] - y[i]) / h[i]);
-  }
-
-  // Solve tridiagonal system for second derivatives
-  u[1] = 2 * (h[0] + h[1]);
-  v[1] = b[1] - b[0];
-
-  for (let i = 2; i < n - 1; i++) {
-    u[i] = 2 * (h[i - 1] + h[i]) - (h[i - 1] * h[i - 1]) / u[i - 1];
-    v[i] = b[i] - b[i - 1] - (h[i - 1] * v[i - 1]) / u[i - 1];
-  }
-
-  const z = new Array(n).fill(0);
-  for (let i = n - 2; i > 0; i--) {
-    z[i] = (v[i] - h[i] * z[i + 1]) / u[i];
-  }
-
-  // Evaluate spline at new points
-  const result = [];
-  for (let i = 0; i < xNew.length; i++) {
-    const xi = xNew[i];
-
-    // Find interval containing xi
-    let j = 0;
-    for (let k = 0; k < n - 1; k++) {
-      if (xi >= x[k] && xi <= x[k + 1]) {
-        j = k;
-        break;
-      }
-    }
-
-    const dx = xi - x[j];
-    const a = (z[j + 1] - z[j]) / (6 * h[j]);
-    const b_val = z[j] / 2;
-    const c = (y[j + 1] - y[j]) / h[j] - (h[j] * (2 * z[j] + z[j + 1])) / 6;
-    const d = y[j];
-
-    result.push(a * dx * dx * dx + b_val * dx * dx + c * dx + d);
-  }
-
-  return result;
-}
-
-// Function to resample data using spline interpolation (matching backend)
-function resampleWithSpline(timestamps, values, targetTimestamps) {
-  // Filter out NaN values
-  const validIndices = [];
-  const validTimestamps = [];
-  const validValues = [];
-
-  for (let i = 0; i < values.length; i++) {
-    if (!isNaN(values[i]) && values[i] !== null) {
-      validIndices.push(i);
-      validTimestamps.push(timestamps[i]);
-      validValues.push(values[i]);
-    }
-  }
-
-  if (validValues.length < 2) {
-    return targetTimestamps.map(() => 0);
-  }
-
-  return splineInterpolation(validTimestamps, validValues, targetTimestamps);
-}

@@ -159,7 +159,7 @@ const AreaPlot = ({
       .domain([dataStart, dataEnd]) // Input domain (data range)
       .range([0, svgWidth]); // Output range (pixels in SVG)
 
-    let domain = [60, 150, 250];
+    let domain = [60, 160, 300];
     if (normalizeStatus) {
       domain = [30, 70, 100];
     }
@@ -257,7 +257,7 @@ const AreaPlot = ({
       ];
       const labels = ["100%", "50%", "0%", "50%", "100%"];
 
-      let yOffset = 21;
+      let yOffset = 30;
       // For each position, append a horizontal line and a text label at the left edge.
       positions.forEach((yPos, i) => {
         linesGroup
