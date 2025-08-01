@@ -1029,12 +1029,14 @@ function grabData(data2, set_Data, setLoading = null) {
         audio.word.push(loadedData[i].word);
         audio.amp.push(loadedData[i].vol);
         audio.pitch.push(loadedData[i].pitch);
-        audio.min_var_pitch.push(loadedData[i][12]);
-        audio.avg_var_pitch.push(loadedData[i][13]);
-        audio.max_var_pitch.push(loadedData[i][14]);
+        // Initialize variance arrays with zeros since backend doesn't calculate them
+        audio.min_var_pitch.push(0);
+        audio.avg_var_pitch.push(0);
+        audio.max_var_pitch.push(0);
       }
-      audio.amp = movingAverage(audio.amp, 5);
-      audio.pitch = movingAverage(audio.pitch, 3);
+      // Remove moving average - backend doesn't apply it
+      // audio.amp = movingAverage(audio.amp, 5);
+      // audio.pitch = movingAverage(audio.pitch, 3);
       set_Data(audio);
       // Turn off loading state if setter is provided
       if (setLoading) {
